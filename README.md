@@ -8,6 +8,7 @@ A Python library for algorithmic film score composition, built on [music21](http
 - **Harmonic analysis** using Late Romantic voice-leading rules (Korngold / Herrmann style)
 - **Orchestration templates** for string quartet, chamber orchestra, and full symphony
 - **Batch rendering** of cue sheets from CSV timecode files
+- **Shared render registry** — all renders are logged to the project dashboard for team visibility
 
 ## Quickstart
 
@@ -21,7 +22,7 @@ nightingale convert score.musicxml --output score.mid --tempo 92
 ```
 nightingale/
 ├── __init__.py
-├── converter.py      # MusicXML ↔ MIDI
+├── converter.py      # MusicXML ↔ MIDI + registry integration
 ├── harmony.py        # Voice-leading engine
 ├── orchestrate.py    # Template-based orchestration
 ├── render.py         # Batch cue sheet renderer
@@ -37,14 +38,7 @@ All contributors must follow these project standards when writing or modifying P
 
 ### Code Patterns
 
-New modules should follow the patterns established in existing code. See `converter.py` for the canonical example — it demonstrates the expected structure for:
-
-- Import organization and type hints
-- Function signatures with NumPy-style docstrings
-- Usage analytics integration (all public functions should call `_log_usage`)
-- Error handling conventions
-
-When adding a new module, copy the structure of `converter.py` and adapt it for your feature.
+New modules should follow the patterns established in `converter.py` — it demonstrates the expected structure for import organization, type hints, NumPy-style docstrings, and registry integration. When adding a new module, mirror `converter.py` closely.
 
 ### Code Style
 
