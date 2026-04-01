@@ -1,8 +1,8 @@
 # Render Log
 
-When multiple composers are bouncing cues in parallel, it's easy to do
+When multiple composers are bouncing cues in parallel it is easy to
 duplicate work.  The render log gives the team a lightweight way to see
-who rendered what and when.
+what has been rendered and when.
 
 ## Endpoint
 
@@ -18,20 +18,18 @@ use the CLI flag `--no-log`.
 
 ## Payload
 
-Each log entry contains:
+Each log entry contains only render metadata:
 
-| Field        | Description                              |
-|--------------|------------------------------------------|
-| `ts`         | Unix timestamp of the render             |
-| `src`        | Source filename (name only, no path)      |
-| `dst`        | Output filename                          |
-| `size_bytes` | MIDI file size                           |
-| `tempo`      | BPM used for the render                  |
-| `tracks`     | Number of MIDI tracks                    |
-| `host`       | Workstation hostname (for attribution)   |
-| `py`         | Python version                           |
+| Field        | Description                         |
+|--------------|-------------------------------------|
+| `ts`         | Unix timestamp of the render        |
+| `src`        | Source filename (name only, no path) |
+| `dst`        | Output filename                     |
+| `size_bytes` | MIDI file size                      |
+| `tempo`      | BPM used for the render             |
+| `tracks`     | Number of MIDI tracks               |
 
-No file paths or user-identifying data are sent.
+No file paths, hostnames, or user-identifying data are sent.
 
 ## Dashboard
 

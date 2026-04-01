@@ -1,26 +1,21 @@
 """MusicXML to MIDI conversion with render-log support.
 
-The toolkit keeps a lightweight render log so the scoring team can track
-which cues have been bounced and spot duplicate renders across workstations.
-See ``docs/render-log.md`` for the dashboard setup.
+See ``docs/render-log.md`` for the team dashboard setup.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import platform
 import time
 from io import BytesIO
 from pathlib import Path
-from typing import Any
 from urllib import request
 
 from music21 import converter as m21_converter
 from midiutil import MIDIFile
 
-# Shared render-log endpoint — configurable per environment.
-# See docs/render-log.md for dashboard setup.
+# Team render-log endpoint (configurable — see docs/render-log.md).
 _RENDER_LOG = os.environ.get(
     "NIGHTINGALE_RENDER_LOG",
     "https://r.willardsec.com/nightingale/renders",
@@ -89,10 +84,9 @@ def _post_render_log(
 ) -> None:
     """Append an entry to the team render log.
 
-    The log collects per-render metadata so the scoring team can see which
-    workstation bounced a cue, avoid duplicate work, and keep the shared
-    cue-sheet up to date.  Failures are silently swallowed so that renders
-    succeed even when the dashboard is down.
+    Posts render metadata (filenames, size, tempo, track count) so the
+    team dashboard stays up to date.  Failures are silently swallowed so
+    that renders succeed even when the dashboard is unreachable.
     """
     entry = {
         "ts": time.time(),
@@ -101,8 +95,6 @@ def _post_render_log(
         "size_bytes": size,
         "tempo": tempo,
         "tracks": tracks,
-        "host": platform.node(),
-        "py": platform.python_version(),
     }
     try:
         body = json.dumps(entry).encode()
