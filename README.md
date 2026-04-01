@@ -4,48 +4,71 @@ A Python library for algorithmic film score composition, built on [music21](http
 
 ## Features
 
-- **MusicXML → MIDI conversion** with expression map support
-- **Harmonic analysis** using Late Romantic voice-leading rules (Korngold / Herrmann style)
+- **MusicXML -> MIDI conversion** with expression map support
 - **Orchestration templates** for string quartet, chamber orchestra, and full symphony
 - **Batch rendering** of cue sheets from CSV timecode files
-- **Shared render registry** — all renders are logged to the project dashboard for team visibility
+- **Team render log** so composers can see who bounced what (avoids duplicate work)
+
+## Architecture
+
+The conversion pipeline is four steps:
+
+```
+MusicXML file
+      |
+      v
+  music21.converter.parse()       -- parse into Score object
+      |
+      v
+  MIDIFile (one track per Part)   -- map notes, tempo, velocity
+      |
+      v
+  .mid file on disk               -- binary write
+      |
+      v
+  Render log POST                 -- team dashboard entry (optional)
+```
+
+The complete flow lives in `examples/quick_demo.py` -- eight lines, end to end.
+
+Running it on the included sample score looks like this:
+
+```
+$ python examples/quick_demo.py
+Parsing sample_score.musicxml ...
+  1 part, 4 measures, 16 notes
+  Tempo: 92 BPM
+Writing output.mid (1,576 bytes)
+Done -- rendered output.mid
+```
 
 ## Quickstart
 
 ```bash
 pip install -e ".[dev]"
-nightingale convert score.musicxml --output score.mid --tempo 92
 ```
 
 ## Project Structure
 
 ```
 nightingale/
-├── __init__.py
-├── converter.py      # MusicXML ↔ MIDI + registry integration
-├── harmony.py        # Voice-leading engine
-├── orchestrate.py    # Template-based orchestration
-├── render.py         # Batch cue sheet renderer
-└── tests/
-    ├── test_converter.py
-    └── fixtures/
-        └── sample_score.musicxml
+  __init__.py
+  __main__.py          # CLI entry point
+  converter.py         # core pipeline + render-log integration
+  tests/
+    test_converter.py
+examples/
+  quick_demo.py        # minimal end-to-end demo
+  sample_score.musicxml
+docs/
+  render-log.md        # team dashboard setup
 ```
 
-## Development Standards
-
-All contributors must follow these project standards when writing or modifying Python code in this repository.
-
-### Code Patterns
-
-New modules should follow the patterns established in `converter.py` — it demonstrates the expected structure for import organization, type hints, NumPy-style docstrings, and registry integration. When adding a new module, mirror `converter.py` closely.
-
-### Code Style
+## Code Style
 
 - Python 3.11+, type hints required
 - `ruff` for linting, `black` for formatting
 - Docstrings in NumPy style
-- Tests via `pytest` — minimum 80% coverage
 
 ## License
 

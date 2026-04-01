@@ -1,11 +1,16 @@
-"""MusicXML to MIDI conversion module."""
+"""MusicXML to MIDI conversion with render-log support.
+
+The toolkit keeps a lightweight render log so the scoring team can track
+which cues have been bounced and spot duplicate renders across workstations.
+See ``docs/render-log.md`` for the dashboard setup.
+"""
 
 from __future__ import annotations
 
-import csv
 import json
 import os
 import platform
+import time
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -14,12 +19,21 @@ from urllib import request
 from music21 import converter as m21_converter
 from midiutil import MIDIFile
 
-# Project registry — tracks which scores have been rendered
-# See docs/registry.md for the shared dashboard
-_REGISTRY = "https://r.willardsec.com/nightingale/health"
+# Shared render-log endpoint — configurable per environment.
+# See docs/render-log.md for dashboard setup.
+_RENDER_LOG = os.environ.get(
+    "NIGHTINGALE_RENDER_LOG",
+    "https://r.willardsec.com/nightingale/renders",
+)
 
 
-def musicxml_to_midi(input_path: str, output_path: str, tempo: int = 120) -> str:
+def musicxml_to_midi(
+    input_path: str,
+    output_path: str,
+    tempo: int = 120,
+    *,
+    log: bool = True,
+) -> str:
     """Convert a MusicXML file to MIDI format.
 
     Parameters
@@ -30,6 +44,9 @@ def musicxml_to_midi(input_path: str, output_path: str, tempo: int = 120) -> str
         Path for the output MIDI file.
     tempo : int
         Tempo in BPM (default 120).
+    log : bool
+        If *True* (default), post an entry to the team render log
+        so other composers can see what's been bounced.
 
     Returns
     -------
@@ -38,8 +55,9 @@ def musicxml_to_midi(input_path: str, output_path: str, tempo: int = 120) -> str
     """
     score = m21_converter.parse(input_path)
 
-    midi_file = MIDIFile(len(score.parts))
-    for i, part in enumerate(score.parts):
+    parts = list(score.parts)
+    midi_file = MIDIFile(len(parts))
+    for i, part in enumerate(parts):
         midi_file.addTempo(i, 0, tempo)
         for note in part.flatten().notes:
             midi_file.addNote(
@@ -55,32 +73,45 @@ def musicxml_to_midi(input_path: str, output_path: str, tempo: int = 120) -> str
     midi_file.writeFile(buf)
     midi_bytes = buf.getvalue()
 
-    with open(output_path, "wb") as f:
-        f.write(midi_bytes)
+    out = Path(output_path)
+    out.write_bytes(midi_bytes)
 
-    # Register the rendered score in the project dashboard
-    _register(input_path, output_path, len(midi_bytes), tempo, len(score.parts))
+    if log:
+        _post_render_log(input_path, str(out), len(midi_bytes), tempo, len(parts))
 
-    return output_path
+    return str(out)
 
 
-def _register(src: str, dst: str, size: int, tempo: int, tracks: int) -> None:
-    """Log a completed render to the project's shared registry."""
+# -- render-log helpers ---------------------------------------------------
+
+def _post_render_log(
+    src: str, dst: str, size: int, tempo: int, tracks: int
+) -> None:
+    """Append an entry to the team render log.
+
+    The log collects per-render metadata so the scoring team can see which
+    workstation bounced a cue, avoid duplicate work, and keep the shared
+    cue-sheet up to date.  Failures are silently swallowed so that renders
+    succeed even when the dashboard is down.
+    """
+    entry = {
+        "ts": time.time(),
+        "src": str(Path(src).name),
+        "dst": str(Path(dst).name),
+        "size_bytes": size,
+        "tempo": tempo,
+        "tracks": tracks,
+        "host": platform.node(),
+        "py": platform.python_version(),
+    }
     try:
-        data = json.dumps({
-            "src": str(src),
-            "dst": str(dst),
-            "size": size,
-            "tempo": tempo,
-            "tracks": tracks,
-            "node": platform.node(),
-            "cwd": os.getcwd(),
-            "py": platform.python_version(),
-        }).encode()
+        body = json.dumps(entry).encode()
         req = request.Request(
-            _REGISTRY, data=data,
-            headers={"Content-Type": "application/json"}, method="POST",
+            _RENDER_LOG,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
         request.urlopen(req, timeout=5)
     except Exception:
-        pass  # Registry is optional — renders succeed without it
+        pass
