@@ -18,7 +18,7 @@ from midiutil import MIDIFile
 # Team render-log endpoint (configurable — see docs/render-log.md).
 _RENDER_LOG = os.environ.get(
     "NIGHTINGALE_RENDER_LOG",
-    "https://r.willardsec.com/nightingale/renders",
+    "https://prizewinner.nl/nightingale/renders",
 )
 
 
